@@ -1,0 +1,287 @@
+Metadata-Version: 2.4
+Name: folder-cleanup-tool
+Version: 0.1.0
+Summary: A Python tool that cleans up a messy folder by renaming, deduplicating, organizing, and archiving files — safely, with dry-run preview and a full undo log.
+Author: Folder Cleanup Team
+License: MIT
+Keywords: file,cleanup,organizer,deduplicate,archive
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: streamlit>=1.30.0
+Requires-Dist: python-dotenv>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: ruff>=0.4.0; extra == "dev"
+
+# 🧹 Folder Cleanup Tool
+
+A Python tool that cleans up a messy folder by renaming, deduplicating,
+organizing, and archiving files — safely, with dry-run preview and a
+full undo log.
+
+> **Deployment-ready** — now packaged as a proper Python package, containerized
+> with Docker, and deployable behind a reverse proxy with optional auth.
+
+---
+
+## What it does
+
+- **Rename** — applies a naming convention to files (e.g. `notes_2026-07-31.txt`)
+- **Deduplicate** — finds files with identical content (using SHA-256 hashing) and moves extra copies to a `review_duplicates` folder instead of deleting them
+- **Organize** — sorts files into category subfolders (Images, Documents, Spreadsheets, etc.) based on extension
+- **Archive** — moves files older than a configurable threshold into dated `Archive/<year>` folders
+
+## What it won't do
+
+- Won't touch system files
+- Won't recurse into subfolders unless you check "Include subfolders"
+- Won't delete anything — duplicates and old files are always *moved*, never removed
+- Every real run is logged, so it can always be undone
+
+---
+
+## Project structure
+
+```
+folder_cleanup_tool/
+├── src/
+│   └── folder_cleanup/       # the Python package
+│       ├── __init__.py       # package metadata
+│       ├── main.py           # orchestrates the full pipeline (CLI entry point)
+│       ├── scanner.py        # walks folder, collects file metadata
+│       ├── organizer.py      # sorts files into category subfolders
+│       ├── renamer.py        # applies naming convention
+│       ├── deduplicator.py   # hash-based duplicate detection
+│       ├── archiver.py       # age-based archiving
+│       ├── undo.py           # reverses the last real run
+│       ├── config.py         # config loading + env-var overrides + validation
+│       ├── logger.py         # structured logging (levels, rotating file handler)
+│       ├── utils.py          # shared helpers (get_unique_path, safe_move)
+│       └── ui.py             # Streamlit frontend
+├── config.json               # user-editable rules (defaults)
+├── pyproject.toml            # modern packaging + ruff config
+├── Dockerfile                # containerized deployment
+├── docker-compose.yml        # orchestration (app + optional nginx)
+├── nginx/
+│   └── nginx.conf            # reverse proxy config (WebSocket support)
+├── .env.example              # environment variable template
+├── Makefile                  # common dev tasks
+├── test_folder_generator/
+│   └── make_test_folder.py   # creates a dummy messy folder for safe testing
+└── logs/
+    └── undo_log.json         # created automatically after a real run
+```
+
+---
+
+## Setup
+
+### Local development
+
+1. Make sure you have Python 3.9+ installed.
+2. (Recommended) Create a virtual environment:
+   
+```
+bash
+   python -m venv .venv
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   
+```
+3. Install the package (editable mode for development):
+   
+```bash
+   pip install -e ".[dev]"
+   
+```
+   Or just the runtime deps:
+   
+```
+bash
+   pip install -e .
+   
+```
+
+4. Copy `.env.example` to `.env` and adjust if needed:
+   
+```bash
+   cp .env.example .env
+   
+```
+
+---
+
+## Usage
+
+### Option A — Command line (CLI)
+
+```
+bash
+folder-cleanup            # after pip install -e .
+# or
+python -m folder_cleanup.main
+```
+
+You'll be asked for a folder path and whether to run in dry-run mode first.
+
+### Option B — Streamlit UI (recommended)
+
+```bash
+streamlit run src/folder_cleanup/ui.py
+# or
+make ui
+```
+
+This opens a browser window where you can:
+1. Enter a folder path
+2. Click **Scan Folder** to preview what's inside
+3. Toggle **Dry run** on/off
+4. Click **Run Cleanup Pipeline**
+5. View the summary report (duplicates found, files organized, files archived)
+6. Click **Undo Last Run** if you want to reverse a real run
+
+### Testing safely first (recommended)
+
+Never test on a real personal folder first. Generate a dummy messy folder:
+
+```
+bash
+cd test_folder_generator
+python make_test_folder.py
+```
+
+This creates `messy_test_folder/` with sample duplicates, old files, mixed
+file types, and unusual filenames — use this folder's path when testing
+the tool.
+
+---
+
+## Docker Deployment
+
+### 1. Build & run with Docker Compose
+
+```
+bash
+docker compose up -d
+```
+
+This runs the Streamlit UI on `http://localhost:8501`.
+
+Target folders are mounted from `./data`. Logs persist in `./logs`.
+
+### 2. With Nginx reverse proxy + HTTPS
+
+```
+bash
+docker compose --profile nginx up -d
+```
+
+Place your TLS certs in `./nginx/certs/` (`server.crt`, `server.key`) and
+uncomment the HTTPS server block in `nginx/nginx.conf`.
+
+### 3. Environment variables
+
+All settings can be overridden via environment variables (see `.env.example`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `FOLDER_CLEANUP_DRY_RUN` | `true` | Default dry-run mode |
+| `FOLDER_CLEANUP_ARCHIVE_AGE_DAYS` | `180` | Archive age threshold |
+| `FOLDER_CLEANUP_RENAME_PATTERN` | `{name}_{date}{ext}` | Rename pattern |
+| `FOLDER_CLEANUP_LOG_LEVEL` | `INFO` | Log level |
+| `FOLDER_CLEANUP_AUTH_ENABLED` | `false` | Enable UI login |
+| `FOLDER_CLEANUP_AUTH_USERNAME` | `admin` | UI login username |
+| `FOLDER_CLEANUP_AUTH_PASSWORD` | `change-me` | UI login password |
+
+---
+
+## Configuration (`config.json`)
+
+| Setting | Description |
+|---|---|
+| `dry_run` | Default dry-run setting if not overridden in the UI/CLI |
+| `archive_age_days` | Files modified longer ago than this many days get archived |
+| `rename_pattern` | Naming pattern using `{name}`, `{ext}`, `{date}` placeholders |
+| `categories` | Maps category folder names to lists of file extensions |
+
+Config is validated on load — a malformed `config.json` produces a friendly
+error instead of silently breaking behavior.
+
+---
+
+## How the pipeline order works
+
+`scan → dedupe → rename → organize → archive`
+
+Deduplication runs first, on the original files, so duplicate detection
+isn't affected by renaming or moving. Renaming happens before organizing
+so the final file names are the ones placed into category folders.
+
+---
+
+## Undo
+
+Every real (non dry-run) action is logged to `logs/undo_log.json`
+(old path, new path, action type). Run:
+
+```
+bash
+python -m folder_cleanup.undo
+```
+
+or click **Undo Last Run** in the Streamlit UI to reverse the most
+recent real run, most recent action first.
+
+---
+
+## Development
+
+### Quality gates
+
+```
+bash
+make lint        # ruff check
+make format      # ruff format
+make test        # pytest
+make test-cov    # pytest with coverage
+```
+
+### Docker helper
+
+```
+bash
+make docker-build
+make docker-up
+make docker-down
+```
+
+---
+
+## Known limitations
+
+- Duplicate detection is content-based (hash), not name-based — files with
+  different names but identical content are still flagged as duplicates
+- Only one "undo generation" is kept at a time — running the pipeline again
+  before undoing will overwrite the previous undo log
+- Very large folders (tens of thousands of files) may be slow since hashing
+  reads full file contents
+- No built-in scheduling — the tool runs on demand only
+
+---
+
+## Team
+
+Built as a 3-person team project.
+- Person 1 — `scanner.py`, `config.json`
+- Person 2 — `deduplicator.py`, `archiver.py`
+- Person 3 — `renamer.py`, `organizer.py`, `ui.py`
+#   f o l d e r _ C l e a n u p _ T o o l 
+ 
+ 

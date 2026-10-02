@@ -1,0 +1,2 @@
+[console_scripts]
+folder-cleanup = folder_cleanup.main:main
