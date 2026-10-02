@@ -362,7 +362,7 @@ Before running cleanup operations:
 
 ## License
 
-Add the appropriate license for your project before publishing the repository.
+N/A
 
 ## Author
 
