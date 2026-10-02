@@ -1,0 +1,52 @@
+# ============================================
+# Folder Cleanup Tool - Docker Compose
+# ============================================
+#
+# Usage:
+#   docker-compose up -d           # Run the app
+#   docker-compose up -d --profile nginx  # Run with nginx reverse proxy
+#
+# Volumes:
+#   ./data:/data           - target folders to clean up (mounted read-write)
+#   ./logs:/app/logs       - application logs (persisted)
+#   ./config.json:/app/config.json - config (bind-mount for live edits)
+
+services:
+  app:
+    build: .
+    container_name: folder-cleanup-app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      - FOLDER_CLEANUP_DRY_RUN=${FOLDER_CLEANUP_DRY_RUN:-true}
+      - FOLDER_CLEANUP_ARCHIVE_AGE_DAYS=${FOLDER_CLEANUP_ARCHIVE_AGE_DAYS:-180}
+      - FOLDER_CLEANUP_LOG_LEVEL=${FOLDER_CLEANUP_LOG_LEVEL:-INFO}
+      - FOLDER_CLEANUP_AUTH_ENABLED=${FOLDER_CLEANUP_AUTH_ENABLED:-false}
+      - FOLDER_CLEANUP_AUTH_USERNAME=${FOLDER_CLEANUP_AUTH_USERNAME:-admin}
+      - FOLDER_CLEANUP_AUTH_PASSWORD=${FOLDER_CLEANUP_AUTH_PASSWORD:-change-me}
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+      - ./config.json:/app/config.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Optional: reverse proxy with HTTPS (enable with --profile nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: folder-cleanup-nginx
+    profiles: ["nginx"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - app

@@ -1,0 +1,41 @@
+# ============================================
+# Docker ignore - keep image small
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs / runtime data
+logs/
+*.log
+data/
+
+# Test artifacts
+test_folder_generator/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitignore
